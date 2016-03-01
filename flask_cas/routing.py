@@ -4,6 +4,7 @@ from flask import current_app
 from .cas_urls import create_cas_login_url
 from .cas_urls import create_cas_logout_url
 from .cas_urls import create_cas_validate_url
+from flask.ext.principal import Identity, AnonymousIdentity, identity_changed
 
 
 try:
@@ -31,6 +32,7 @@ def login():
     """
 
     cas_token_session_key = current_app.config['CAS_TOKEN_SESSION_KEY']
+    cas_username_session_key = current_app.config['CAS_USERNAME_SESSION_KEY']
 
     redirect_url = create_cas_login_url(
         current_app.config['CAS_SERVER'],
@@ -43,6 +45,9 @@ def login():
     if cas_token_session_key in flask.session:
 
         if validate(flask.session[cas_token_session_key]):
+            identity_changed.send(current_app._get_current_object(),
+                                  identity=Identity(
+                                      flask.session[cas_username_session_key]))
             if 'CAS_AFTER_LOGIN_SESSION_URL' in flask.session:
                 redirect_url = flask.session.pop('CAS_AFTER_LOGIN_SESSION_URL')
             else:
@@ -80,6 +85,9 @@ def logout():
         redirect_url = create_cas_logout_url(
             current_app.config['CAS_SERVER'],
             current_app.config['CAS_LOGOUT_ROUTE'])
+
+    identity_changed.send(current_app._get_current_object(),
+                          identity=AnonymousIdentity())
 
     current_app.logger.debug('Redirecting to: {0}'.format(redirect_url))
     return flask.redirect(redirect_url)
